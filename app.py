@@ -1,53 +1,42 @@
+from flask import Flask, request, abort, Response, redirect
 import os
-from random import randint
+import requests
+import base64
+import json
 
-from plotly.graph_objs import *
+app = Flask(__name__)
 
-import flask
-import dash
+@app.route('/')
+def homepage():
 
-from bin.credentials import prompt_api_credentials
+    CLIENT_ID = os.environ.get('CLIENT_ID')
+    CLIENT_SECRET = os.environ.get('CLIENT_SECRET')
+    CALLBACK_URL = os.environ.get('CALLBACK_URL')
+    REDIRECT_URL = os.environ.get('REDIRECT_URL')
 
+    SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 
-# Setup the app
-server = flask.Flask(__name__)
-server.secret_key = os.environ.get('secret_key', str(randint(0, 1000000)))
-app = dash.Dash(__name__, server=server)
+    auth_token = request.args.get('code')
 
-# Dash code
-# Run this app with `python app.py` and
-# visit http://127.0.0.1:8050/ in your web browser.
+    code_payload = {
+        "grant_type": "authorization_code",
+        "code": str(auth_token),
+        "redirect_uri": CALLBACK_URL
+    }
 
-from dash import Dash, html, dcc
-import plotly.express as px
-import pandas as pd
+    auth = "{}:{}".format(CLIENT_ID, CLIENT_SECRET)
+    base64encoded = base64.urlsafe_b64encode(auth.encode('UTF-8')).decode('ascii')
+    headers = {"Authorization": "Basic {}".format(base64encoded)}
+    post_request = requests.post(SPOTIFY_TOKEN_URL, data=code_payload, headers=headers)
 
-app = Dash(__name__)
+    response_data = json.loads(post_request.content)
 
-# assume you have a "long-form" data frame
-# see https://plotly.com/python/px-arguments/ for more options
-df = pd.DataFrame({
-    "Fruit": ["Apples", "Oranges", "Bananas", "Apples", "Oranges", "Bananas"],
-    "Amount": [4, 1, 2, 2, 4, 5],
-    "City": ["SF", "SF", "SF", "Montreal", "Montreal", "Montreal"]
-})
+    if 'error' in response_data:
+        abort(400)
+        abort(Response(response_data['error_description']))
 
-fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
+    
+    return redirect('{redirect}/{access}'.format(redirect=REDIRECT_URL, access=response_data['access_token']), code=302)
 
-app.layout = html.Div(children=[
-    html.H1(children='Hello Dash'),
-
-    html.Div(children='''
-        Dash: A web application framework for your data.
-    '''),
-
-    dcc.Graph(
-        id='example-graph',
-        figure=fig
-    )
-])
-
-# Run the Dash app
 if __name__ == '__main__':
-    prompt_api_credentials()
-    #app.server.run(debug=True, threaded=True)
+    app.run(debug=True, use_reloader=True)

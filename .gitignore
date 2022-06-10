@@ -1,2 +1,1 @@
-bin/credentials.py
-bin/__pycache__
+creds.py

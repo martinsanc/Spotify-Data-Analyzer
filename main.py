@@ -19,8 +19,5 @@ if __name__=='__main__':
     print("Creating connection...")
     sp = run_client()
 
-    playlists = get_playlists(sp)
-    tracks = get_tracks_from_playlist(sp, 'spotify:playlist:5VVrMk2Zna7wyySHMxakH5')
-
-    print()
-
+    playlists = fetch_playlists(sp)
+    tracks = fetch_tracks_from_playlist(sp, 'spotify:playlist:5z3guJ2dysFmmNElgk7xJb')

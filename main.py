@@ -1,15 +1,26 @@
 import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
-from spotipy.oauth2 import SpotifyClientCredentials
+import bin.cred as cred
+from bin.data import *
 
-auth_manager = SpotifyClientCredentials()
-sp = spotipy.Spotify(auth_manager=auth_manager)
+# API Permissions
+scope = "playlist-read-collaborative playlist-read-private user-read-recently-played user-top-read"
 
-playlists = sp.user_playlists('spotify')
-while playlists:
-    for i, playlist in enumerate(playlists['items']):
-        print("%4d %s %s" % (i + 1 + playlists['offset'], playlist['uri'],  playlist['name']))
-    if playlists['next']:
-        playlists = sp.next(playlists)
-    else:
-        playlists = None
+
+def run_client():
+    # Creates the spotify client with the given ids in cred.py file.
+    auth_manager = SpotifyOAuth(client_id=cred.CLIENT_ID, client_secret= cred.CLIENT_SECRET, redirect_uri=cred.REDIRECT_URL, scope=scope)
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    return sp
+
+
+if __name__=='__main__':
+    print("Creating connection...")
+    sp = run_client()
+
+    playlists = get_playlists(sp)
+    tracks = get_tracks_from_playlist(sp, 'spotify:playlist:5VVrMk2Zna7wyySHMxakH5')
+
+    print()
+

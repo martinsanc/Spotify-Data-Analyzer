@@ -4,30 +4,38 @@ import pandas as pd
 
 DATA_PATH = "data/"
 
-# ENTRY POINT
+# FETCH DATA ENTRY POINTS
 
 def fetch_user_playlist_tracks(sp, debug=False):
     # Fetch playlists
     if debug: print("Reading playlist data...", end='\t')
     playlists = fetch_playlists(sp)
-    playlists.to_json("{}user_playlists.json".format(DATA_PATH), double_precision=5, indent=2)
-    if debug: print("Done reading {} Rows".format(str(playlists.shape[0])))
+    if debug: print("Done reading {} playlists.".format(str(playlists.shape[0])))
 
     #Fetch tracks from playlist
     tracks = pd.DataFrame()
     for i, playlist in playlists.iterrows():
         if debug:
-            if i > 3:
-                continue
+            #if i > 2: continue
             print("\tReading playlist '{}' ({} tracks)...".format(playlist['name'], playlist['track_count']), end='\t')
         playlist_tracks = fetch_tracks_from_playlist(sp, playlist.uri)
         playlist_tracks['playlist'] = playlist['name']
         tracks = pd.concat([tracks, playlist_tracks])
         if debug: print("Done.")
-    return tracks
+    save_tracks(tracks, "playlist")
+
+def fetch_user_top_tracks(sp, debug=False):
+    if debug: print("Fetching top tracks...", end='\t')
+    ranges = ['short_term', 'medium_term', 'long_term']
+    top_tracks = pd.DataFrame()
+    for r in ranges:
+        tracks = fetch_top_tracks(sp, r)
+        top_tracks = pd.concat([top_tracks, tracks])
+    save_tracks(top_tracks, "toptracks")
+    if debug: print("Done.")
 
 
-# LOADING DATAFRAMES
+# FETCH DATA
 
 def fetch_playlists(sp):
     results = sp.current_user_playlists()
@@ -41,6 +49,31 @@ def fetch_playlists(sp):
     playlists = pd.DataFrame(playlist_list)
     return playlists
 
+def fetch_top_tracks(sp, time_range, audio_features=True, genres=True):
+    results = sp.current_user_top_tracks(time_range=time_range)
+    top_tracks = results['items']
+    while results['next'] is not None:
+        results = sp.next(results)
+        top_tracks.extend(results['items'])
+    track_list = []
+    for i, track in enumerate(top_tracks):
+        if not track['is_local']:
+            try:
+                track = get_track_metadata(track)
+                track['rank'] = i+1
+                track['time_range'] = time_range
+                if audio_features:
+                    audio_features = fetch_audio_features(sp, track['uri'])
+                    track = track | audio_features
+                if genres:
+                    genres = fetch_genres(sp, track['artist_uri'], track['album_uri'])
+                    track = track | genres
+                track_list.append(track)
+            except TypeError:
+                continue
+    top_tracks = pd.DataFrame(track_list)
+    return top_tracks
+    
 def fetch_tracks_from_playlist(sp, playlist_uri, audio_features=True, genres=True):
     results = sp.playlist_tracks(playlist_uri)
     tracks = results['items']
@@ -51,7 +84,7 @@ def fetch_tracks_from_playlist(sp, playlist_uri, audio_features=True, genres=Tru
     for i, track in enumerate(tracks):
         if not track['is_local']:
             try:
-                track = get_track_metadata(track)
+                track = get_track_metadata(track['track'])
                 if audio_features:
                     audio_features = fetch_audio_features(sp, track['uri'])
                     track = track | audio_features
@@ -107,17 +140,34 @@ def get_playlist_metadata(playlist):
     return playlist
 
 def get_track_metadata(track):
-    track = {'name': track['track']['name'],
-             'id': track['track']['id'],
-             'uri': track['track']['uri'],
-             'popularity': track['track']['popularity'],
-             'artist_name': track['track']['artists'][0]['name'],
-             'artist_id': track['track']['artists'][0]['id'],
-             'artist_uri': track['track']['artists'][0]['uri'],
-             'album_name': track['track']['album']['name'],
-             'album_id': track['track']['album']['id'],
-             'album_uri': track['track']['album']['uri'],
-             'release_date': track['track']['album']['release_date'],
-             'duration_ms': track['track']['duration_ms'],
-             'image_url': track['track']['album']['images'][0]['url']}
+    track = {'name': track['name'],
+             'id': track['id'],
+             'uri': track['uri'],
+             'popularity': track['popularity'],
+             'artist_name': track['artists'][0]['name'],
+             'artist_id': track['artists'][0]['id'],
+             'artist_uri': track['artists'][0]['uri'],
+             'album_name': track['album']['name'],
+             'album_id': track['album']['id'],
+             'album_uri': track['album']['uri'],
+             'release_date': track['album']['release_date'],
+             'duration_ms': track['duration_ms'],
+             'image_url': track['album']['images'][0]['url']}
     return track
+
+
+# FILE MANAGEMENT
+
+def save_tracks(tracks, preffix, genres=True):
+    if genres:
+        genre_list = []
+        for i, track in tracks.iterrows():
+            for g in track['genres']:
+                if g is not None:
+                    genre_list.append({'track_id': track['id'],
+                                       'genre': g})
+        genre_list = pd.DataFrame(genre_list)
+        genre_list.to_csv("{}{}_genres.csv".format(DATA_PATH, preffix))
+    del(tracks['genres'])
+    tracks.to_csv("{}{}_tracks.csv".format(DATA_PATH, preffix), encoding='utf-8', index=False)
+    

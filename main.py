@@ -7,7 +7,6 @@ from bin.data import fetch_user_playlist_tracks, fetch_user_top_tracks
 # API Permissions
 scope = "playlist-read-collaborative playlist-read-private user-read-recently-played user-top-read"
 
-
 def run_client():
     # Creates the spotify client with the given ids in cred.py file.
     auth_manager = SpotifyOAuth(client_id=cred.CLIENT_ID, client_secret= cred.CLIENT_SECRET, redirect_uri=cred.REDIRECT_URL, scope=scope)
@@ -19,7 +18,5 @@ if __name__=='__main__':
     print("Creating connection...")
     sp = run_client()
 
-    playlist_tracks = fetch_user_playlist_tracks(sp, debug=True)
-    #top_tracks = fetch_user_top_tracks(sp, debug=True)
-
-    print()
+    fetch_user_playlist_tracks(sp, debug=True)
+    fetch_user_top_tracks(sp, debug=True)

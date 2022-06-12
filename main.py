@@ -2,7 +2,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 import bin.cred as cred
-from bin.data import fetch_user_playlist_tracks, fetch_user_top_tracks
+from bin.fetch import fetch_user_playlist_tracks, fetch_user_top_tracks
 
 # API Permissions
 scope = "playlist-read-collaborative playlist-read-private user-read-recently-played user-top-read"
